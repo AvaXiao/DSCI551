@@ -1,0 +1,11 @@
+For A:
+The number of requests is 38 the size of download data is 15271 bytes.
+
+For B use countrylanguage:
+The number of requests is 38, the size of download data is 17327 bytes.
+
+For B use country_nested:
+The number of requests is 1, the size of download data is 17512 bytes.
+
+For C:
+The number of requests is 6, the size of download data is 91045 bytes.

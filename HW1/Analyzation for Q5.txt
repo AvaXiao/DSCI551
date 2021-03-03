@@ -1,0 +1,16 @@
+I wrote a code to record the performance of scripts in question 4, and the output file named "data_Q5.txt". I copied all the data to this file and you can find them below.
+
+From these data, we can find that although both A and B request 38 times, their data size is so different. So, we can conclude that city table is smaller than contrylanguage. B use country_nested can request only once since we merge contrylanguage and country into one table, and it runs faster. However, it takes more data size. I guess that is because a child node will take more size of data than a parent node. As for C, I found that if I request the whole table will take less size of data than filter continents first.
+
+
+For A:
+The number of requests is 38 the size of download data is 15271 bytes.
+
+For B use countrylanguage:
+The number of requests is 38, the size of download data is 17327 bytes.
+
+For B use country_nested:
+The number of requests is 1, the size of download data is 17512 bytes.
+
+For C:
+The number of requests is 6, the size of download data is 91045 bytes.

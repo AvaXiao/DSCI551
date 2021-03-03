@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wildfire Monitoring System</title>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.15/esri/themes/light/main.css">
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/3/w3.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+
+    <link href="http://js.arcgis.com/3.12/esri/css/esri.css" rel="stylesheet">
+
+    <style type="text/css">
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+        img {
+            position: absolute;
+            left: 0px;
+            top: 0px;
+            z-index: -1;
+        }
+        div .center {
+            font-size: 18px;
+            color: white;
+            font-size:60px;
+            font-family:verdana;
+            text-shadow: 0px 0px 5px yellow;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        #description .cur{
+            opacity:1;
+            filter:alpha(opacity=100);
+        }
+
+
+        .my-custom-scrollbar {
+            position: relative;
+            height: 600px;
+            overflow: auto;
+        }
+        .table-wrapper-scroll-y {
+            display: block;
+        }
+
+        .CornerButtons {
+            position: fixed;
+            bottom: 100px;
+            right: 10px;
+            display: -webkit-box;
+            display: -ms-flexbox;
+            display: flex;
+            -webkit-box-orient: vertical;
+            -webkit-box-direction: normal;
+            -ms-flex-direction: column;
+            flex-direction: column;
+            -webkit-transition: -webkit-transform .2s ease;
+            transition: -webkit-transform .2s ease;
+            transition: transform .2s ease;
+            transition: transform .2s ease,-webkit-transform .2s ease;
+            will-change: transfrom;
+        }
+
+        .nameClass {
+            margin-bottom: 10px;
+            text-align: left;
+            margin-left:15%;
+            opacity: 0.60;
+        }
+
+        .tableFixHead thead th { position: sticky; top: 0; background:#ffffff; }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/7.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.7.0/firebase-database.js"></script>
+
+    <script src="https://js.arcgis.com/4.15/"></script>
+    <script>
+        var config = {
+            apiKey: "AIzaSyA_M-4o85aTaEy6VvjzCHJg7irezL7zrxE",
+            authDomain: "wildfire-40a78.firebaseapp.com",
+            databaseURL: "https://wildfire-40a78.firebaseio.com",
+            projectId: "wildfire-40a78",
+            storageBucket: "wildfire-40a78.appspot.com",
+            messagingSenderId: "195705209280",
+            appId: "1:195705209280:web:c1ed6135f37c06a2254825"
+        };
+
+
+        firebase.initializeApp(config);
+        var today = new Date().toLocaleString("sv", {timeZone: "America/Los_Angeles"}).slice(0, 10);
+        var date = today;
+        var features = [];
+        var view;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('date').value = date;
+        }, false);
+
+
+        function drawMap(view, features, date) {
+            require([
+                "esri/Map",
+                "esri/views/MapView",
+                "esri/Graphic",
+                "esri/layers/FeatureLayer",
+                "esri/layers/GraphicsLayer",
+                "esri/core/promiseUtils",
+                "esri/geometry/Point",
+                "esri/tasks/Locator",
+                "esri/Color",
+                "esri/renderers/SimpleRenderer",
+                "esri/symbols/TextSymbol",
+                "esri/symbols/Font",
+                "esri/widgets/Search"
+            ], function (Map,
+                         MapView,
+                         Graphic,
+                         FeatureLayer,
+                         GraphicsLayer,
+                         promiseUtils,
+                         Point,
+                         Locator,
+                         Color,
+                         SimpleRenderer,
+                         TextSymbol,
+                         Font,
+                         Search
+            ) {
+
+                view = new MapView({
+                    container: "viewDiv",
+                    map: new Map({
+                        basemap: "topo-vector",
+                    }),
+                    center: [-119.449438, 37.166062], // longitude, latitude
+                    zoom: 7,
+                });
+
+                var fireRenderer = {
+                    type: "simple",
+                    symbol: {
+                        type: "picture-marker",
+                        url: "https://www.flaticon.com/svg/static/icons/svg/870/870620.svg",
+                        width: "16px",
+                        height: "16px"
+                    }
+                }
+
+                // Search widget
+                var search = new Search({
+                    view: view
+                });
+
+                view.ui.add(search, "top-right");
+
+                function getData(callbackIN) {
+                    var ref = firebase.database().ref(date); //change to today
+                    ref.once('value').then(function (snapshot) {
+                        callbackIN(snapshot.val())
+                    })
+                        .then(checkFeatures)
+                        .then(createFeatureLayer)
+                        .then(addToView)
+                        .then(addToTable)
+                        .then(getSummaryData)
+                };
+
+                function genFunction(data) {
+                    var i = 1;
+                    Object.entries(data).forEach(([inst, valu]) => {
+                        features.push({
+                            geometry: {type: "point", x: valu.Longitude, y: valu.Latitude},
+                            attributes: {
+                                ObjectID: i,
+                                IncidentID: inst,
+                                IncidentName: valu.IncidentName,
+                                City: valu.City,
+                                County: valu.County,
+                                State: valu.State,
+                                DiscoveryAcres: valu.DiscoveryAcres,
+                                DailyAcres: valu.DailyAcres || "Unknown",
+                                FireCause: valu.FireCause || "Unknown",
+                                FireDiscoveryDateTime: valu.FireDiscoveryDateTime || "Unknown",
+                                InitialResponseAcres: valu.InitialResponseAcres || "Unknown",
+                                PercentContained: valu.PercentContained || "Unknown",
+                                ContainmentDateTime: valu.ContainmentDateTime || "Unknown",
+                                ControlDateTime: valu.ControlDateTime || "Unknown"
+                            }
+                        });
+                        i += 1
+                    })
+                };
+
+                view.when()
+                    .then(getData(genFunction));
+
+                function checkFeatures(){
+                    if (features.length == 0){
+                        addToTable();
+                    }
+                    else {
+                        return features;
+                    }
+                }
+
+                function createFeatureLayer() {
+                    var fireLayer = new FeatureLayer({
+                        source: features,  // array of graphics objects
+                        objectIdField: "ObjectID",
+                        fields: [
+                            {name: "ObjectID", type: "oid"},
+                            {name: "City", type: "string"},
+                            {name: "ContainmentDateTime", type: "string"},
+                            {name: "ControlDateTime", type: "string"},
+                            {name: "County", type: "string"},
+                            {name: "DailyAcres", type: "string"},
+                            {name: "DiscoveryAcres", type: "string"},
+                            {name: "FireCause", type: "string"},
+                            {name: "FireDiscoveryDateTime", type: "string"},
+                            {name: "IncidentID", type: "string"},
+                            {name: "IncidentName", type: "string"},
+                            {name: "InitialResponseAcres", type: "string"},
+                            {name: "PercentContained", type: "string"},
+                            {name: "State", type: "string"},
+                        ],
+                        popupTemplate: {
+                            title: "{City}, {County}",
+                            content: [{
+                                type: "fields", fieldInfos: [
+                                    {fieldName: "IncidentID", label: "Incident ID"},
+                                    {fieldName: "IncidentName", label: "Incident Name"},
+                                    {fieldName: "DailyAcres", label: "Daily Acres"},
+                                    {fieldName: "DiscoveryAcres", label: "Discovery Acres"},
+                                    {fieldName: "FireCause", label: "Fire Cause"},
+                                    {fieldName: "FireDiscoveryDateTime", label: "Fire Discovery DateTime"},
+                                    {fieldName: "InitialResponseAcres", label: "Initial Response Acres"},
+                                    {fieldName: "PercentContained", label: "Percent Contained"}//,
+                                    //{fieldName:"ContainmentDateTime",label:"Containment DateTime"},
+                                    //{fieldName:"ControlDateTime",label:"Control DateTime"}
+                                ]
+                            }]
+                        },
+                        renderer: fireRenderer,
+                    });
+                    search.sources.push({
+                        layer: fireLayer,
+                        searchFields: ["IncidentName"],
+                        displayField: "IncidentName",
+                        exactMatch: false,
+                        outFields: ["IncidentName"],
+                        resultGraphicEnabled: true,
+                        name: "Incident Name",
+                    });
+                    view.ui.add(search, "top-right");
+                    return fireLayer;
+                }
+
+                // Adds a given layer to the map in the view
+                function addToView(layer) {
+                    view.map.add(layer);
+                }
+
+                function addToTable() {
+                    var len = features.length;
+                    var tbody = document.getElementById("tbody");
+                    tbody.innerHTML = "";
+
+                    for (var i = 0; i < len; i++) {
+                        var row = getDataRow(features[i].attributes);
+                        tbody.appendChild(row);
+                    };
+                }
+
+
+                function getDataRow(row) {
+                    var tr = document.createElement("tr");
+
+                    var td0 = document.createElement("td");
+                    td0.innerHTML = row.ObjectID;
+                    tr.appendChild(td0);
+                    var td1 = document.createElement("td");
+                    td1.innerHTML = row.IncidentName;
+                    tr.appendChild(td1);
+                    var td2 = document.createElement("td");
+                    td2.innerHTML = row.IncidentID;
+                    tr.appendChild(td2);
+                    var td3 = document.createElement("td");
+                    td3.innerHTML = row.DailyAcres;
+                    tr.appendChild(td3);
+
+                    var td4 = document.createElement("td");
+                    td4.innerHTML = row.DiscoveryAcres;
+                    tr.appendChild(td4);
+                    var td5 = document.createElement("td");
+                    td5.innerHTML = row.FireCause;
+                    tr.appendChild(td5);
+                    var td6 = document.createElement("td");
+                    td6.innerHTML = row.FireDiscoveryDateTime;
+                    tr.appendChild(td6);
+                    var td7 = document.createElement("td");
+                    td7.innerHTML = row.InitialResponseAcres;
+                    tr.appendChild(td7);
+                    var td8 = document.createElement("td");
+                    td8.innerHTML = row.City;
+                    tr.appendChild(td8);
+                    var td9 = document.createElement("td");
+                    td9.innerHTML = row.County;
+                    tr.appendChild(td9);
+                    var td10 = document.createElement("td");
+                    td10.innerHTML = row.State;
+                    tr.appendChild(td10);
+                    var td11 = document.createElement("td");
+                    td11.innerHTML = row.ContainmentDateTime;
+                    tr.appendChild(td11);
+                    var td12 = document.createElement("td");
+                    td12.innerHTML = row.PercentContained;
+                    tr.appendChild(td12);
+                    var td13 = document.createElement("td");
+                    td13.innerHTML = row.ControlDateTime;
+                    tr.appendChild(td13);
+
+                    return tr;
+                }
+
+
+                function getSummaryData(){
+                    var url = 'http://127.0.0.1:5000/data?date='+date
+                    var httpRequest = new XMLHttpRequest();
+                    httpRequest.open("POST",url,true);
+                    httpRequest.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+                    httpRequest.setRequestHeader("Access-Control-Allow-Origin", '*');
+                    httpRequest.setRequestHeader("Access-Control-Allow-Headers", 'x-requested-with');
+                    httpRequest.setRequestHeader("Access-Control-Allow-Methods", 'OPTIONS,POST,GET');
+                    httpRequest.setRequestHeader("Access-Control-Allow-Credentials", true);
+                    httpRequest.onreadystatechange = ()=>{
+                        if(httpRequest.readyState == 4 && httpRequest.status == 200){
+                            var data = eval(httpRequest.responseText);
+                            addToSummary(data);
+                        }
+                    }
+                    httpRequest.send();
+                };
+
+
+                function addToSummary(data){
+                    var groupbody = document.getElementById("groupbody");
+                    var idx_group = 1;
+                    groupbody.innerHTML = "";
+
+                    for (var val in data) {
+                        var tr = document.createElement("tr");
+                        var td0 = document.createElement("td");
+                        td0.innerHTML = idx_group;
+                        tr.appendChild(td0);
+                        var td1 = document.createElement("td");
+                        td1.innerHTML = data[val][0];
+                        tr.appendChild(td1);
+                        var td2 = document.createElement("td");
+                        td2.innerHTML = data[val][1];
+                        tr.appendChild(td2);
+                        idx_group += 1;
+
+                        groupbody.appendChild(tr);
+                    }
+                };
+            });
+        }
+
+        drawMap(view, features, date)
+    </script>
+    <script>
+        function changeDate(e) {
+            var date = e.target.value;
+            var features = [];
+            drawMap(view, features, date)
+                // .then(addToTable(features));
+        }
+
+        function searchFunction() {
+            var input, filter, table, tr, td, i;
+            input = document.getElementById("searchvalue");
+            filter = input.value.toUpperCase();
+
+            table = document.getElementById("querytable");
+            let content = table.getElementsByTagName("tbody")[0];
+            tr = content.getElementsByTagName("tr");
+            console.log(tr.length)
+
+            for (i = 0; i < tr.length; i++) {
+                tds = tr[i].getElementsByTagName("td");
+                flag = 0;
+                if (tds) {
+                    console.log(filter)
+                    for (j=0;j<tds.length;j++) {
+                        td = tds.item(j);
+                        if (td.innerHTML.toUpperCase().includes(filter)) {//.indexOf(filter) > -1) {
+                            flag = 1;
+                        }
+                    }
+                    if (flag==1){
+                        tr[i].style.display = "";
+                    }else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            };
+        }
+    </script>
+</head>
+
+<body>
+<nav id="navigation" class="w3-bar w3-black">
+    <a href="#viewDiv" class="w3-button w3-bar-item">Fire Map</a>
+    <a href="#description" class="w3-button w3-bar-item">Description</a>
+    <a href="#rawData" class="w3-button w3-bar-item">Raw Data</a>
+    <a href="#contact" class="w3-button w3-bar-item">Contact</a>
+</nav>
+<div id="header" style="height:300px;">
+    <img src="https://www.munichre.com/content/dam/munichre/global/images/royalty-free/GettyImages-145057928.jpg/_jcr_content/renditions/cropped.3_to_1.jpg.image_file.2560.853.file/cropped.3_to_1.jpg" alt="Fire header" style="width:100%;height:300px;"/>
+    <h1 class="center">Wildfire Monitoring System</h1>
+</div>
+
+<div id="description" class="w3-container w3-center w3-content" style="display:block;max-width:800px">
+    <h2 class="w3-wide" style="font-family:verdana; margin-bottom: 30px;">Project Description</h2>
+    <p class="w3-opacity">2020's fire season has already seen above-normal activity. It has been a brutal summer for firefighters and thousands of residents in California. </p>
+    <p class="w3-opacity">While weather conditions and air quality have continued to get worse, firefighters are monitoring the shape, size, rate of perimeter increase, and rate of area growth of a wind-driven wildland fire closely.</p>
+    <p class="w3-opacity">This project is to better share maps and data related to wildfire activities across California, helping people keep track of wildfires and take proactive measures to save lives and property.</p>
+</div>
+
+<div id="viewDiv" class="w3-container" style="height:500px;margin-top:50px;margin-bottom:100px;align-self:center;padding-left:10%;padding-right: 10%;"></div>
+
+<div id="rawData" style="width:80%;margin-left:10%;margin-bottom:100px;">
+    <div class="w3-container w3-center w3-content" style="display:block;max-width:800px;margin-bottom:30px;">
+        <h2 class="w3-wide" style="font-family:verdana;">Raw Data</h2>
+        <label for="date">Date: </label>
+        <input type="date" id="date" name="date" value="2020-11-23" onchange="changeDate(event);">
+        <!--        ///////search frame-->
+        <!--        <div style="width:100%;height:20px"></div>-->
+        <!--        <div>-->
+        <span style='color:red;margin-right:1.25em; display:inline-block;'>&nbsp;</span>
+        <input type="text" name="" id="searchvalue">
+        <input type="button" value="Search" onclick="searchFunction()">
+        <!--        </div>-->
+        <!--        <div style="width:100%;height:20px"></div>-->
+        <!--        ///////search frame-->
+    </div>
+    <div id="rdTable" style="overflow-x:auto;" class="table-wrapper-scroll-y my-custom-scrollbar">
+        <table class="table table-striped table-bordered mb-0 tableFixHead" id="querytable">
+            <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">IncidentName</th>
+                <th scope="col">IncidentID</th>
+                <th scope="col">DailyAcres</th>
+                <th scope="col">DiscoveryAcres</th>
+                <th scope="col">FireCause</th>
+                <th scope="col">FireDiscoveryDateTime</th>
+                <th scope="col">InitialResponseAcres</th>
+                <th scope="col">City</th>
+                <th scope="col">County</th>
+                <th scope="col">State</th>
+                <th scope="col">ContainmentDateTime</th>
+                <th scope="col">PercentContained</th>
+                <th scope="col">ControlDateTime</th>
+            </tr>
+            </thead>
+            <tbody id="tbody">
+
+            </tbody>
+        </table>
+    </div>
+    <p>Raw Data from <a href="https://data-nifc.opendata.arcgis.com/" target="_blank">The National Interagency Fire Center (NIFC)</a></p>
+</div>
+
+
+<div id="summarize" style="width:80%;margin-left:10%;margin-bottom:100px;">
+    <div class="w3-container w3-center w3-content" style="display:block;max-width:800px;margin-bottom:30px;">
+        <h2 class="w3-wide" style="font-family:verdana;">Summarize</h2>
+    </div>
+    <div id="numTable" style="overflow-x:auto;" class="table-wrapper-scroll-y my-custom-scrollbar">
+        <table class="table table-striped table-bordered mb-0 tableFixHead" id="grouptable">
+            <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">County</th>
+                <th scope="col">number of fire</th>
+            </tr>
+            </thead>
+            <tbody id="groupbody">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<div class="CornerButtons">
+    <button type="button" class="btn btn-lg">
+        <a href="#" style="font-size:30px">⬆️</a>
+    </button>
+</div>
+
+<div id="contact" class="w3-container w3-center w3-content cur" style="display:block;max-width:800px;margin-bottom:50px">
+    <h2 class="w3-wide" style="font-family:verdana;margin-bottom:30px;">Project Members</h2>
+    <h5 class="nameClass">Jiaying Wang: Applied Data Science</h5>
+    <h5 class="nameClass">Yanan Lin: Computer Science (Multimedia & Creative Technology)</h5>
+    <h5 class="nameClass">Yao Xiao: Applied Data Science</h5>
+</div>
+</body>
+</html>

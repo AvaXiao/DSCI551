@@ -1,0 +1,65 @@
+html, body, #viewDiv {
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+}
+img {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    z-index: -1;
+}
+div .center {
+    font-size: 18px;
+    color: white;
+    font-size:60px;
+    font-family:verdana;
+    text-shadow: 0px 0px 5px yellow;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+}
+
+#description .cur{
+    opacity:1;
+    filter:alpha(opacity=100);
+}
+
+
+.my-custom-scrollbar {
+    position: relative;
+    height: 600px;
+    overflow: auto;
+}
+.table-wrapper-scroll-y {
+    display: block;
+}
+
+.CornerButtons {
+    position: fixed;
+    bottom: 100px;
+    right: 10px;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -ms-flex-direction: column;
+    flex-direction: column;
+    -webkit-transition: -webkit-transform .2s ease;
+    transition: -webkit-transform .2s ease;
+    transition: transform .2s ease;
+    transition: transform .2s ease,-webkit-transform .2s ease;
+    will-change: transfrom;
+}
+
+.nameClass {
+    margin-bottom: 10px;
+    text-align: left;
+    margin-left:15%;
+    opacity: 0.60;
+}
+
+.tableFixHead thead th { position: sticky; top: 0; background:#ffffff; }
